@@ -50,7 +50,7 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
     </flow>
     <flow name="getFlightFormFlow">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/flights" allowedMethods="GET" doc:name="HTTP"/>
-        <parse-template location="src/main/resources/FlightFinder.html" doc:name="Parse Template"/>
+        <parse-template location="FlightFinder.html" doc:name="Parse Template"/>
         <logger level="INFO" doc:name="Logger"/>
     </flow>
     <flow name="getAmericanFlightsFlow">

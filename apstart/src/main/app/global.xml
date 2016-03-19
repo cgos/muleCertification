@@ -29,7 +29,7 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
 " service="TicketServiceService" port="TicketServicePort" serviceAddress="http://training-u.cloudhub.io/essentials/delta" doc:name="Web Service Consumer"/>
 
     <db:mysql-config name="Training_MySQL_Configuration" host="mudb.mulesoft-training.com" port="3306" user="mule" password="mule" database="training" doc:name="MySQL Configuration"/>
-    <jms:activemq-connector name="Active_MQ" specification="1.1" brokerURL="tcp://54.69.115.37:61616" validateConnections="true" doc:name="Active MQ"/>
+    
     <sfdc:config name="Salesforce__Basic_Authentication" username="gosselinchristian@gmail.com" password="Clone123." securityToken="BES3FfqY0l1v8CDbfEx0Rb0z" doc:name="Salesforce: Basic Authentication"/>
     <mulexml:jaxb-context name="JAXB_Context" packageNames="com.mulesoft.training" doc:name="JAXB Context"/>
     <data-mapper:config name="List_Map__To_Pojo" transformationGraphPath="list_map__to_pojo.grf" doc:name="List_Map__To_Pojo"/>
