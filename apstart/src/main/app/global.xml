@@ -35,4 +35,14 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
     <data-mapper:config name="List_Map__To_Pojo" transformationGraphPath="list_map__to_pojo.grf" doc:name="List_Map__To_Pojo"/>
     <data-mapper:config name="String_To_Xml_findFlight_" transformationGraphPath="string_to_xml_findflight_.grf" doc:name="String_To_Xml_findFlight_"/>
     <payload-type-filter expectedType="java.util.ArrayList" name="FilterNotArrayList" doc:name="Payload"/>
+    <choice-exception-strategy name="globalChoice_Exception_Strategy">
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.api.expression.ExpressionRuntimeException)]" doc:name="Catch Expression Exception">
+            <set-payload value="#['The application is currently unavailable']" doc:name="Set Payload"/>
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy doc:name="Catch All Other Exception">
+            <set-payload value="#['Data is currently unavailable']" doc:name="Set Payload"/>
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </choice-exception-strategy>
 </mule>
