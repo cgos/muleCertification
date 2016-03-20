@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+<mule xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:json="http://www.mulesoft.org/schema/mule/json"
 	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
 	xmlns:file="http://www.mulesoft.org/schema/mule/file"
 	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
@@ -14,7 +14,9 @@ http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/fil
 http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
-http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd">
+    <data-mapper:config name="CSV_To_Map" transformationGraphPath="csv_to_map.grf" doc:name="CSV_To_Map"/>
 <flow name="getBankAccountsFlow">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/bank" allowedMethods="GET" doc:name="HTTP"/>
         <http:request config-ref="Bank_REST_Request_Configuration" path="/customers/{customer_id}/accounts" method="GET" doc:name="HTTP">
@@ -24,10 +26,13 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
         </http:request>
     </flow>
     <flow name="getCSVAccountsFlow">
-        <file:inbound-endpoint path="src/main/resources/input" moveToPattern="#[message.inboundProperties.originalFilename].backup" moveToDirectory="src/main/resources/output" responseTimeout="10000" doc:name="File">
+        <file:inbound-endpoint path="src/main/resources/input"  moveToDirectory="src/main/resources/output" responseTimeout="10000" doc:name="File">
             <file:filename-regex-filter pattern=".*csv" caseSensitive="false"/>
         </file:inbound-endpoint>
-        <file:file-to-string-transformer doc:name="File to String"/>
+        <data-mapper:transform config-ref="CSV_To_Map" doc:name="CSV To Map"/>
+        <foreach doc:name="For Each">
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        </foreach>
         <logger message="#[payload]" level="INFO" doc:name="Logger"/>
     </flow>   
     <flow name="getSFDCAccountsFlow">
