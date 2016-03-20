@@ -15,6 +15,22 @@ http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/
 http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
 http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
 http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd">
+    <flow name="getAllAirlineFlightsFlow">
+        <scatter-gather doc:name="Scatter-Gather">
+            <processor-chain>
+                <flow-ref name="getUnitedFlightsFlow" doc:name="getUnitedFlightsFlow"/>
+                <filter ref="FilterNotArrayList" doc:name="Filter Not An Array List"/>
+            </processor-chain>
+            <processor-chain>
+                <flow-ref name="getDeltaFlightsFlow" doc:name="getDeltaFlightsFlow"/>
+                <filter ref="FilterNotArrayList" doc:name="Filter Not An Array List"/>
+            </processor-chain>
+            <processor-chain>
+                <flow-ref name="getAmericanFlightsFlow" doc:name="getAmericanFlightsFlow"/>
+                <filter ref="FilterNotArrayList" doc:name="Filter Not An Array List"/>
+            </processor-chain>
+        </scatter-gather>
+    </flow>
 <flow name="getUnitedFlightsFlow">
           <http:listener config-ref="HTTP_Listener_Configuration" path="/united" allowedMethods="GET" doc:name="HTTP"/>
         <set-variable variableName="destination" value="#[(flowVars.destination ==empty &amp;&amp; message.inboundProperties.'http.query.params'.code == empty) ? 'SFO' : (flowVars.destination != empty ? flowVars.destination : message.inboundProperties.'http.query.params'.code)]" doc:name="set destination"/>
@@ -23,6 +39,7 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
                 <http:uri-param paramName="destination" value="#[flowVars.destination]"/>
             </http:request-builder>
         </http:request>
+        <expression-filter expression="#[payload.available() != 0]" doc:name="Expression"/>
         <json:json-to-object-transformer returnClass="com.mulesoft.training.FlightArray" doc:name="JSON to Object"/>
         <set-payload value="#[payload.flights]" doc:name="Set Payload to Flights"/>
         <logger level="INFO" doc:name="Logger"/>
@@ -38,6 +55,7 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
         </data-mapper:transform>
         <ws:consumer config-ref="Delta_Web_Service_Consumer" operation="findFlight" doc:name="Web Service Consumer"/>
         <mulexml:jaxb-xml-to-object-transformer returnClass="com.mulesoft.training.FlightArray" jaxbContext-ref="JAXB_Context" doc:name="XML to JAXB Object"/>
+        <expression-filter expression="#[payload.flights != null]" doc:name="Filter no results"/>
         <set-payload value="#[payload.flights]" doc:name="Set Payload to Flights"/>
         <logger level="INFO" doc:name="Logger"/>
     </flow>
@@ -46,13 +64,26 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
         <json:json-to-object-transformer returnClass="com.mulesoft.training.FlightRequest" doc:name="JSON to Object"/>
         <set-variable variableName="destination" value="#[payload.destination]" doc:name="Variable"/>
         <logger level="INFO" doc:name="Logger"/>
-        <scatter-gather doc:name="Scatter-Gather">
-            <flow-ref name="getUnitedFlightsFlow" doc:name="getUnitedFlightsFlow"/>
-            <flow-ref name="getDeltaFlightsFlow" doc:name="getDeltaFlightsFlow"/>
-            <flow-ref name="getAmericanFlightsFlow" doc:name="getAmericanFlightsFlow"/>
-        </scatter-gather>
+        <choice doc:name="Choice">
+            <when expression="#[payload.airline == 'all']">
+                <flow-ref name="getAllAirlineFlightsFlow" doc:name="getAllAirlineFlightsFlow"/>
+            </when>
+            <when expression="#[payload.airline == 'united']">
+                <flow-ref name="getUnitedFlightsFlow" doc:name="getUnitedFlightsFlow"/>
+            </when>
+            <when expression="#[payload.airline == 'delta']">
+                <flow-ref name="getDeltaFlightsFlow" doc:name="getDeltaFlightsFlow"/>
+            </when>
+            <when expression="#[payload.airline == 'american']">
+                <flow-ref name="getAmericanFlightsFlow" doc:name="getAmericanFlightsFlow"/>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
         <combine-collections-transformer doc:name="Combine Collections"/>
-        <custom-transformer class="com.mulesoft.training.FlightSortTransformer" doc:name="Java"/>
+        <expression-filter expression="#[payload[0] is com.mulesoft.training.Flight]" doc:name="Filter no results"/>
+        <custom-transformer class="com.mulesoft.training.FlightSortTransformer" doc:name="Sort by price"/>
         <json:object-to-json-transformer doc:name="Object to JSON"/>
         <logger level="INFO" doc:name="Logger"/>
     </flow>
@@ -67,6 +98,7 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
         <db:select config-ref="Training_MySQL_Configuration" doc:name="Database">
             <db:parameterized-query><![CDATA[select * from flights where toAirport = #[flowVars.destination]]]></db:parameterized-query>
         </db:select>
+        <expression-filter expression="#[payload != []]" doc:name="Expression"/>
         <data-mapper:transform config-ref="List_Map__To_Pojo" doc:name="List&lt;Map&gt; To Pojo"/>
         <logger message="#[payload]" level="INFO" doc:name="Logger"/>
     </flow>
