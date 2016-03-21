@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+<mule xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json"
 	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
 	xmlns:file="http://www.mulesoft.org/schema/mule/file"
 	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
@@ -15,7 +15,9 @@ http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
 http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd">
+http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
     <data-mapper:config name="CSV_To_Map" transformationGraphPath="csv_to_map.grf" doc:name="CSV_To_Map"/>
 <flow name="getBankAccountsFlow">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/bank" allowedMethods="GET" doc:name="HTTP"/>
@@ -25,7 +27,29 @@ http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schem
             </http:request-builder>
         </http:request>
     </flow>
-    <flow name="getCSVAccountsFlow">
+    <batch:job name="accountsCSVBatch">
+        <batch:input>
+            <file:inbound-endpoint path="src/main/resources/input" moveToDirectory="src/main/resources/output" responseTimeout="10000" doc:name="File">
+                <file:filename-regex-filter pattern=".*csv" caseSensitive="false"/>
+            </file:inbound-endpoint>
+            <data-mapper:transform config-ref="CSV_To_Map" doc:name="CSV To Map (Deprecated)"/>
+            <set-variable variableName="size" value="#[payload.size()]" doc:name="size"/>
+        </batch:input>
+        <batch:process-records>
+            <batch:step name="Batch_Step">
+                <set-variable variableName="fname" value="#[payload.Name]" doc:name="Variable"/>
+                <batch:set-record-variable variableName="rname" value="#[payload.Name]" doc:name="Record Variable"/>
+                <logger level="INFO" doc:name="Logger"/>
+            </batch:step>
+            <batch:step name="Batch_Step1">
+                <logger level="INFO" doc:name="Logger"/>
+            </batch:step>
+        </batch:process-records>
+        <batch:on-complete>
+            <logger message="#['\n\nProcessed:' + payload.processedRecords + 'Failed: ' + payload.failedRecords]" level="INFO" doc:name="Logger"/>
+        </batch:on-complete>
+    </batch:job>
+    <flow name="getCSVAccountsFlow" initialState="stopped">
         <file:inbound-endpoint path="src/main/resources/input"  moveToDirectory="src/main/resources/output" responseTimeout="10000" doc:name="File">
             <file:filename-regex-filter pattern=".*csv" caseSensitive="false"/>
         </file:inbound-endpoint>
