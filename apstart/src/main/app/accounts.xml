@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json"
 	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
 	xmlns:file="http://www.mulesoft.org/schema/mule/file"
 	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
@@ -17,7 +17,8 @@ http://www.springframework.org/schema/beans http://www.springframework.org/schem
 http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd
 http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
-http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
     <data-mapper:config name="CSV_To_Map" transformationGraphPath="csv_to_map.grf" doc:name="CSV_To_Map"/>
 <flow name="getBankAccountsFlow">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/bank" allowedMethods="GET" doc:name="HTTP"/>
@@ -27,6 +28,25 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
             </http:request-builder>
         </http:request>
     </flow>
+    <batch:job name="accountsBatch">
+        <batch:input>
+            <poll doc:name="Poll">
+                <fixed-frequency-scheduler frequency="30" timeUnit="SECONDS"/>
+                <watermark variable="lastAccountID" default-expression="0" selector="MAX" selector-expression="#[payload.accountID]"/>
+                <db:select config-ref="Training_MySQL_Configuration" doc:name="Database">
+                    <db:parameterized-query><![CDATA[select * from accounts where postal='H9W 5M9' and accountID > #[flowVars.lastAccountID]]]></db:parameterized-query>
+                </db:select>
+            </poll>
+        </batch:input>
+        <batch:process-records>
+            <batch:step name="Batch_Step2">
+                <logger message="#['\n\nrecord:' + payload]" level="INFO" doc:name="Logger"/>
+            </batch:step>
+        </batch:process-records>
+        <batch:on-complete>
+            <logger message="#['\n\n processed:' + payload.processedRecords + 'Failed: ' + payload.failedRecords]" level="INFO" doc:name="Logger"/>
+        </batch:on-complete>
+    </batch:job>
     <batch:job name="accountsCSVBatch">
         <batch:input>
             <file:inbound-endpoint path="src/main/resources/input" moveToDirectory="src/main/resources/output" responseTimeout="10000" doc:name="File">
