@@ -113,25 +113,44 @@ data: {
 <flow name="getUnitedFlightsFlow">
           <http:listener config-ref="HTTP_Listener_Configuration" path="/united" allowedMethods="GET" doc:name="HTTP"/>
         <set-variable variableName="destination" value="#[(flowVars.destination ==empty &amp;&amp; message.inboundProperties.'http.query.params'.code == empty) ? 'SFO' : (flowVars.destination != empty ? flowVars.destination : message.inboundProperties.'http.query.params'.code)]" doc:name="set destination"/>
-        <http:request config-ref="United_REST_Request_Configuration" path="/{destination}/e" method="GET" doc:name="HTTP">
+        <http:request config-ref="United_REST_Request_Configuration" path="/{destination}/" method="GET" doc:name="HTTP" metadata:id="2c576ebf-bc02-40f1-8838-916f508129b6">
             <http:request-builder>
                 <http:uri-param paramName="destination" value="#[flowVars.destination]"/>
             </http:request-builder>
         </http:request>
-        <expression-filter expression="#[payload.available() != 0]" doc:name="Expression"/>
-        <json:json-to-object-transformer returnClass="com.mulesoft.training.FlightArray" doc:name="JSON to Object"/>
-        <set-payload value="#[payload.flights]" doc:name="Set Payload to Flights"/>
+        <dw:transform-message doc:name="json to java">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%type flight = :object{class: "com.mulesoft.training.Flight"}
+---
+payload.flights map {
+	airlineName: $.airlineName,
+	departureDate: $.departureDate,
+	destination: $.destination,
+	availableSeats: $.emptySeats as :number,
+	flightCode: $.code,
+	origination: $.origin,
+	planeType: $.planeType replace /BOING/ with "Boeing",
+	price: $.price as :number {format: "###.##"}
+} as :flight]]></dw:set-payload>
+        </dw:transform-message>
         <logger level="INFO" doc:name="Logger"/>
     </flow>
     <flow name="getDeltaFlightsFlow">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/delta" allowedMethods="GET" doc:name="HTTP"/>
         <set-variable variableName="destination" value="#[(flowVars.destination ==empty &amp;&amp; message.inboundProperties.'http.query.params'.code == empty) ? 'SFO' : (flowVars.destination != empty ? flowVars.destination : message.inboundProperties.'http.query.params'.code)]" doc:name="Set Destination"/>
         <logger message="voici le flow #[flowVars.destination] " level="INFO" doc:name="Logger"/>
-        <data-mapper:transform config-ref="String_To_Xml_findFlight_" input-ref="#[message.inboundProperties[&quot;http.method&quot;]]" doc:name="String To Xml&lt;findFlight&gt;">
-            <data-mapper:input-arguments>
-                <data-mapper:input-argument key="destination">#[flowVars.destination]</data-mapper:input-argument>
-            </data-mapper:input-arguments>
-        </data-mapper:transform>
+        <dw:transform-message metadata:id="9392ccbd-5bfc-4a3c-8508-82b428a19868" doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://soap.training.mulesoft.com/
+---
+{
+	ns0#findFlight: {
+		destination: flowVars.destination
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
         <ws:consumer config-ref="Delta_Web_Service_Consumer" operation="findFlight" doc:name="Web Service Consumer"/>
         <dw:transform-message doc:name="Transform Message">
             <dw:input-payload doc:sample="findFlightResponse_1.xml"/>
